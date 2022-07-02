@@ -9,29 +9,32 @@ import niqe as ni
 import shutil
 import imquality.brisque as brisque
 import warnings
-warnings.filterwarnings("ignore")         #無視套件警告
+warnings.filterwarnings("ignore")         # Ignore Kit Warnings
 from tkinter import filedialog
-from skimage.measure import compare_ssim
+#from skimage.measure import compare_ssim
+from skimage.metrics import structural_similarity
 from PIL import Image
 from PIL import ImageTk
 from pynvml import *
 matplotlib.use("Agg")
 import tensorflow as tf
 
-#限制GPU VRAM使用率僅有75%可使用
+EPOCH_SAVE = 500
+
+#Limit GPU VRAM usage to only 75% available
 gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.75)
 config = tf.compat.v1.ConfigProto(gpu_options=gpu_options)
 session = tf.compat.v1.Session(config=config)
 
-#引入Pix2Pix函數庫
-import pix2pix_256 as pix
+#Introduce the Pix2Pix library
+import pix2pix_512 as pix
 
-#創立Tkinter視窗物件
+# Create Tkinter window objects
 app = tk.Tk()
 entryText_1 = tk.StringVar()
 entryText_2 = tk.StringVar()
 entryText_3 = tk.StringVar()
-#第一執行續，訓練功能
+#1 execution continued, training function
 class Threader(threading.Thread):
 
     def __init__(self, *args, **kwargs):
@@ -44,7 +47,7 @@ class Threader(threading.Thread):
         epoch = int(entryText_2.get())
         fit(epoch, path)
 
-#第二執行續，生成影像
+# Second execution, generate image
 class Threader_2(threading.Thread):
     def __init__(self, *args, **kwargs):
         threading.Thread.__init__(self, *args, **kwargs)
@@ -54,7 +57,7 @@ class Threader_2(threading.Thread):
     def run(self):
         generate_save_images(int(entryText_3.get()), entryText_1.get())
 
-#第三執行續，計算IQA數值
+# The third execution continues, calculating the IQA value
 class Threader_3(threading.Thread):
     def __init__(self, *args, **kwargs):
         threading.Thread.__init__(self, *args, **kwargs)
@@ -64,17 +67,17 @@ class Threader_3(threading.Thread):
     def run(self):
         IQA_cal()
 
-#可接受之影像格式
+# Acceptable image formats
 IMG_EXTENSIONS = [
     '.jpg', '.JPG', '.jpeg', '.JPEG',
     '.png', '.PNG', '.ppm', '.PPM', '.bmp', '.BMP',
 ]
 
-#確認是否為影像
+#Verify if it is an image
 def is_image_file(file):
     return any(file.endswith(extension) for extension in IMG_EXTENSIONS)
 
-#創立含有影像的List
+# Create a List with images
 def make_dataset(dir):
     images = []
     assert os.path.isdir(dir), '%s is not a valid directory' % dir
@@ -85,7 +88,7 @@ def make_dataset(dir):
                 images.append(path)
     return images
 
-#各子資料夾確認
+#Subfolder Confirmation
 def select_folder():
     dirname = filedialog.askdirectory()
     pix.set_path(dirname+"\\")
@@ -131,7 +134,7 @@ def select_folder():
         else:
             gene_save.config(text="image_save" + fail_str)
 
-#設定訓練次數
+# Set the number of training sessions
 def set_epochs():
     epoch = entryText_2.get()
     if epoch.isdigit():
@@ -144,7 +147,7 @@ def set_epochs():
         disable_train()
         check_epoch.configure(state=tk.ACTIVE)
 
-#訓練功能
+#Training Features
 def fit(epochs, path):
     total_time = 0.0
     row = 0
@@ -170,7 +173,8 @@ def fit(epochs, path):
             pix.train_step(input_image, target, epoch)
         process_box_2.delete("1.0", "end")
         cost = round(time.time() - start, 2)
-        if (epoch + 1) % 20 == 0:
+        #if (epoch + 1) % 20 == 0:
+        if (epoch + 1) % EPOCH_SAVE == 0:
             pix.checkpoint.save(file_prefix=model_save)
             time_c = 'Time taken for epoch {} is {} sec.......Save model\n'.format(epoch + 1, cost)
         else:
@@ -191,7 +195,7 @@ def fit(epochs, path):
         Gene_GT .config(state=tk.ACTIVE)
     able_train()
 
-#生成訓練預覽圖
+#Generate training previews
 def generate_images(model, test_input, tar):
     prediction = model(test_input, training=True)
     plt.figure(figsize=(15, 15))
@@ -216,7 +220,7 @@ def generate_images(model, test_input, tar):
     labelLogo.image = imgtk
     buf.close()
 
-#主生成功能
+#MasterGenerator function
 def generata_save(model, test_input, tar, count, path):
     count_len = len(str(count))
     if count_len == 1:
@@ -236,7 +240,7 @@ def generata_save(model, test_input, tar, count, path):
     process_box.see(count+1)
     psnr_calculation.config(state=tk.ACTIVE)
 
-#生成測試影像
+#Generate test images
 def generate_save_images(NUM, path):
     Gene_GT.config(state=tk.DISABLED)
     _, test_ds = pix.create_dataset(path)
@@ -262,14 +266,14 @@ def generate_save_images(NUM, path):
     time.sleep(1)
     state.configure(text="State.....Waiting")
 
-#設定生成次數
+# Set the number of times to generate
 def set_gene():
     num = entryText_3.get()
     if num.isdigit():
         if int(num) > 0 and len(entryText_3.get()) > 0:
             Gene_GT.config(state=tk.ACTIVE)
 
-#計算IQA數值
+# Calculation of IQA values
 def IQA_cal():
     process_box.delete(0, tk.END)
     path = entryText_1.get()
@@ -288,7 +292,8 @@ def IQA_cal():
 
         BRI = brisque.score(dehaze)
         psnr = cv2.PSNR(gt, dehaze)
-        ssim = compare_ssim(gt, dehaze, multichannel=True)
+        #ssim = compare_ssim(gt, dehaze, multichannel=True)
+        ssim = structural_similarity(gt, dehaze, multichannel=True)
         niqe_num = ni.niqe(dehaze)
 
         result = gene.split("\\")[-1]
@@ -314,35 +319,35 @@ def IQA_cal():
     process_box.see(count+1)
     state.configure(text="State.....Waiting")
 
-#關閉視窗
+#Close window
 def close_window():
     running = threading.Event()
     running.set()
     running.clear()
     app.destroy()
 
-#關閉訓練按鈕
+#Disable Training Button
 def disable_train():
     Train.configure(state=tk.DISABLED)
     check_epoch.configure(state=tk.DISABLED)
 
-#啟用訓練按鈕
+#Enable Training Button
 def able_train():
     Train.configure(state=tk.ACTIVE)
     check_epoch.configure(state=tk.ACTIVE)
 
-#獲取CPU、GPU資訊
+#Get CPU, GPU information
 nvmlInit()
 MyCPU = numpy.distutils.cpuinfo.cpu.info[0]
 handle = nvmlDeviceGetHandleByIndex(0)
 
-app.title("Pix2Pix-------GPU:" + str(nvmlDeviceGetName(handle))[2:-1] + "---------|---------CPU: " + MyCPU['ProcessorNameString'])   #顯示使用CPU和GPU
-app.geometry('925x750')            #視窗大小 925*750
-app.resizable(width=0, height=0)   #不可變動視窗大小
+app.title("Pix2Pix-------GPU:" + str(nvmlDeviceGetName(handle))[2:-1] + "---------|---------CPU: " + MyCPU['ProcessorNameString'])   #Display the use of CPU and GPU
+app.geometry('925x750')            #Window size 925*750
+app.resizable(width=0, height=0)   #Non-variable window size
 
-textbox_1 = tk.Entry(app, text=entryText_1, borderwidth=3, relief="sunken", width=29)    #左上一框
-textbox_2 = tk.Entry(app, text=entryText_2, borderwidth=3, relief="sunken", width=29)    #左上二框
-textbox_3 = tk.Entry(app, text=entryText_3, borderwidth=3, relief="sunken", width=29)    #左上三框
+textbox_1 = tk.Entry(app, text=entryText_1, borderwidth=3, relief="sunken", width=29)    #Top left box
+textbox_2 = tk.Entry(app, text=entryText_2, borderwidth=3, relief="sunken", width=29)    #2 top left frame
+textbox_3 = tk.Entry(app, text=entryText_3, borderwidth=3, relief="sunken", width=29)    #3 boxes on the top left
 time_record_title = tk.Label(app, text="Time record", height=1, width=10, compound="left")
 working_title = tk.Label(app, text="Working print", height=1, width=10, compound="left")
 state = tk.Label(app, text="State.....Waiting", height=1, width=46, borderwidth=3, relief="sunken", compound="left")
@@ -350,12 +355,12 @@ process_box = tk.Listbox(app, borderwidth=3, width=46, height=28, relief="sunken
 process_box_2 = tk.Text(app, state='disabled', borderwidth=3, width=43, height=34, relief="sunken")
 psnr_calculation = tk.Button(app, text="IQA", height=1, width=42, compound="c", command=lambda: Threader_3(name='Thread-name'))
 
-time_record_title.place(x=250, y=230)   #"Time record"字樣
-process_box.place(x=250, y=255)         #左邊白框之位置設定
-working_title.place(x=600, y=230)       #"Working print"字樣
-process_box_2.place(x=598, y=255)       #右邊白框之位置設定
-state.place(x=250, y=725)               #狀態欄設定
-psnr_calculation.place(x=602, y=720)    #IQA數值計算按鈕位置設定
+time_record_title.place(x=250, y=230)   # "Time Record" words
+process_box.place(x=250, y=255)         #Set the position of the white box on the left
+working_title.place(x=600, y=230)       #"Working print" characters
+process_box_2.place(x=598, y=255)       #Set the position of the white box on the right
+state.place(x=250, y=725)               #Status Bar Settings
+psnr_calculation.place(x=602, y=720)    #IQA value calculation button position setting
 
 im = Image.open("preview.png")
 igtk = ImageTk.PhotoImage(image=im)
@@ -377,7 +382,7 @@ Train = tk.Button(app, text="Start Train", height=3, width=15, compound="c", com
 
 gene_image = tk.Label(app, text="gene Image", height=3, width=18, compound="c")
 gene_num = tk.Button(app, text="Set_num", command=set_gene, height=2, width=9, compound="c")
-Gene_GT = tk.Button(app, text="Genetate Image", height=3, width=15, compound="c", command=lambda: Threader_2(name='Thread-name'))
+Gene_GT = tk.Button(app, text="Generate Image", height=3, width=15, compound="c", command=lambda: Threader_2(name='Thread-name'))
 
 button = tk.Button(app, text="Quit", command=close_window, width=15, compound="c")
 
@@ -389,21 +394,21 @@ psnr_calculation.config(state=tk.DISABLED)
 textbox_1.configure(state='readonly')
 process_box_2.config(state='disabled')
 
-space.grid(column=0, row=0, ipadx=1, pady=1, sticky=tk.W)              #空白
-Image_folder.grid(column=0, row=1, ipadx=50, pady=1, sticky=tk.W)      #選取資料夾按鈕
-Image_path.grid(column=0, row=2, ipadx=50, pady=2, sticky=tk.W+tk.S)   #顯示 "Images Path"
-textbox_1.grid(column=0, row=3, padx=5, pady=2, sticky=tk.W+tk.S)      #顯示主資料夾路徑
-test_path.grid(column=0, row=4, padx=10, pady=2, sticky=tk.W+tk.S)     #測試資料夾確認
-train_path.grid(column=0, row=5, padx=10, pady=2, sticky=tk.W+tk.S)    #訓練資料夾確認
-Model_path.grid(column=0, row=6, padx=10, pady=2, sticky=tk.W+tk.S)    #模型資料夾確認
-gene_save.grid(column=0, row=7, padx=10, pady=2, sticky=tk.W+tk.S)     #生成資料夾確認
-train_epochs.grid(column=0, row=8, padx=10, pady=1, sticky=tk.W+tk.S)  #訓練區
-check_epoch.grid(column=0, row=8, padx=140, pady=1, sticky=tk.W+tk.S)  #訓練次數設定
-textbox_2.grid(column=0, row=9, padx=5, pady=2, sticky=tk.W+tk.S)      #輸入訓練次數
-Train.grid(column=0, row=10, ipadx=50, pady=5, sticky=tk.W+tk.S)       #訓練開始按鈕
-gene_image.grid(column=0, row=11, padx=10, pady=1, sticky=tk.W+tk.S)   #測試區
-gene_num.grid(column=0, row=11, padx=140, pady=1, sticky=tk.W+tk.S)    #測試生成張數
-textbox_3.grid(column=0, row=12, padx=5, pady=2, sticky=tk.W+tk.S)     #輸入張數
-Gene_GT.grid(column=0, row=13, ipadx=50, pady=5, sticky=tk.W+tk.S)     #設定生成次數
-button.grid(column=0, row=14, ipadx=50, pady=8, sticky=tk.W+tk.S)      #開始生成測試影像
-app.mainloop()                                                         #啟動GUI
+space.grid(column=0, row=0, ipadx=1, pady=1, sticky=tk.W)              #Blank
+Image_folder.grid(column=0, row=1, ipadx=50, pady=1, sticky=tk.W)      #select folder button
+Image_path.grid(column=0, row=2, ipadx=50, pady=2, sticky=tk.W+tk.S)   #Display "Images Path"
+textbox_1.grid(column=0, row=3, padx=5, pady=2, sticky=tk.W+tk.S)      #Display the main folder path
+test_path.grid(column=0, row=4, padx=10, pady=2, sticky=tk.W+tk.S)     #Test folder confirmation
+train_path.grid(column=0, row=5, padx=10, pady=2, sticky=tk.W+tk.S)    #Training folder confirmation
+Model_path.grid(column=0, row=6, padx=10, pady=2, sticky=tk.W+tk.S)    #Model folder confirmation
+gene_save.grid(column=0, row=7, padx=10, pady=2, sticky=tk.W+tk.S)     #Generate folder confirmation
+train_epochs.grid(column=0, row=8, padx=10, pady=1, sticky=tk.W+tk.S)  #training area
+check_epoch.grid(column=0, row=8, padx=140, pady=1, sticky=tk.W+tk.S)  #Training count setting
+textbox_2.grid(column=0, row=9, padx=5, pady=2, sticky=tk.W+tk.S)      #Enter the number of training sessions
+Train.grid(column=0, row=10, ipadx=50, pady=5, sticky=tk.W+tk.S)       #Training start button
+gene_image.grid(column=0, row=11, padx=10, pady=1, sticky=tk.W+tk.S)   #Testing area
+gene_num.grid(column=0, row=11, padx=140, pady=1, sticky=tk.W+tk.S)    #test generation sheets
+textbox_3.grid(column=0, row=12, padx=5, pady=2, sticky=tk.W+tk.S)     #Enter the number of sheets
+Gene_GT.grid(column=0, row=13, ipadx=50, pady=5, sticky=tk.W+tk.S)     #set the number of generation
+button.grid(column=0, row=14, ipadx=50, pady=8, sticky=tk.W+tk.S)      #Start test image generation
+app.mainloop()                                                         #Start GUI
