@@ -1,5 +1,6 @@
 import tensorflow as tf
-from keras.backend.tensorflow_backend import set_session
+#from keras.backend.tensorflow_backend import set_session
+from tensorflow.compat.v1.keras.backend import set_session
 tf.compat.v1.enable_eager_execution()
 BUFFER_SIZE = 400
 BATCH_SIZE = 1
@@ -235,9 +236,3 @@ def train_step(input_image, target, epoch):
                                             generator.trainable_variables))
     discriminator_optimizer.apply_gradients(zip(discriminator_gradients,
                                                 discriminator.trainable_variables))
-
-
-
-
-    
-
