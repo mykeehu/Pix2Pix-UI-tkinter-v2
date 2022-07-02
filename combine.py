@@ -23,9 +23,9 @@ def make_dataset(dir):
                 images.append(path)
     return images
 
-input_path = ""        #set your own input images folder 
-target_path  = ""      #set your own target images folder 
-save_dir = ""          #set your own save images folder
+input_path = "imgset/from"        #set your own input images folder 
+target_path  = "imgset/target"      #set your own target images folder 
+save_dir = "imgset/train"          #set your own save images folder
 
 input_img = make_dataset(input_path)    #create a list of images
 target_img  = make_dataset(target_path) #same
@@ -45,5 +45,5 @@ for inp, tar in zip(input_img, target_img):
     tmp = np.hstack((tar_img,inp_img))
 
     #save the combine image to save images folder
-    cv2.imwrite(os.path.join(save_dir + clr[31:33] + ".png"),tmp)
+    cv2.imwrite(os.path.join(save_dir, filename + ".png"),tmp)
     print(filename + " Save...") #comfirm the process
