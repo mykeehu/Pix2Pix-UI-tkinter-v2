@@ -21,6 +21,14 @@ import tensorflow as tf
 
 EPOCH_SAVE = 500
 
+def MKDIR(Dir):
+	if not os.path.isdir(Dir):
+		os.mkdir(Dir)
+MKDIR("imgset")
+MKDIR("imgset/from")
+MKDIR("imgset/target")
+MKDIR("imgset/train")
+
 #Limit GPU VRAM usage to only 75% available
 gpu_options = tf.compat.v1.GPUOptions(per_process_gpu_memory_fraction=0.75)
 config = tf.compat.v1.ConfigProto(gpu_options=gpu_options)
@@ -256,7 +264,7 @@ def generate_save_images(NUM, path):
 
     start = time.time()
     for inp, tar in test_ds.take(NUM):
-        state.configure(text="State.....Generateing")
+        state.configure(text="State.....Generating")
         generata_save(pix.generator, inp, tar, count, path)
         count += 1
     print(time.time()-start)
